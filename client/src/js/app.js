@@ -8,17 +8,31 @@ import Shapes from './shapes';
 const {Rectangle, Point} = Shapes;
 
 import levelBank from './levels'
-console.log(levelBank);
+
 const screen = $("#scuba");
 const statusbar = $("#status_bar");
 const sidebarTarget = $("#sidebar_target");
 
-const map = levelBank.levels.test_level; //makeMap({width:50,height:20});
-console.log(map);
-const camera = Camera.make(Rectangle.make(0,0,30, 10), map.player);
+const levels = [];
+for(let l in levelBank.levels){
+  console.log(l);
+  levels.push(levelBank.levels[l]);
+}
+console.log(levels);
+
+const urlParams = new URLSearchParams(window.location.search);
+let levelIndex = +urlParams.get('level') || 0;
+levelIndex = Math.min(levelIndex, levels.length - 1);
+
+
+let map = levels[levelIndex]; //levels[levelIndex]; //makeMap({width:50,height:20});
+let camera = Camera.make(Rectangle.make(0,0,30, 10), map.player);
 const renderStatus = (map, target) => {
   target.innerHTML = `Oxygen: ${map.player.oxygen}/ ${map.player.maxOxygen }`;
 }
+
+
+
 
 const renderSidebar = (message) => {
   sidebarTarget.innerHTML = message;
@@ -29,13 +43,13 @@ renderStatus(map, statusbar);
 renderSidebar(TEXT.START);
 
 
-const tryMovePlayer = (direction, cameraBox, map) => {
-  const { player } = map;
-  const mapBox = Rectangle.make(0, 0, map.width, map.height);
+const tryMovePlayer = (direction, cameraBox, _map) => {
+  const { player } = _map;
+  const mapBox = Rectangle.make(0, 0, _map.width, _map.height);
   const netMove = Point.add(player, direction);
 
-  const source = map.getCell(player.x, player.y);
-  const destination = map.getCell(netMove.x, netMove.y);
+  const source = _map.getCell(player.x, player.y);
+  const destination = _map.getCell(netMove.x, netMove.y);
 
   // destination blockers
   if(!Rectangle.containsPoint(mapBox, netMove)){
@@ -48,7 +62,7 @@ const tryMovePlayer = (direction, cameraBox, map) => {
   }
 
   const hasFloor = (x,y) => {
-    const lower = map.getCell(x, y+1);
+    const lower = _map.getCell(x, y+1);
     return lower.wall || lower.ladder;
   };
 
@@ -62,7 +76,7 @@ const tryMovePlayer = (direction, cameraBox, map) => {
   }
 
   // HANDLE OXYGEN SUPPLY
-  const hasOxygen = p => [map.getCell(p.x,p.y), ...map.getCellNeighbors(p.x,p.y)].some(cell => !cell.water && !cell.wall);
+  const hasOxygen = p => [_map.getCell(p.x,p.y), ..._map.getCellNeighbors(p.x,p.y)].some(cell => !cell.water && !cell.wall);
   if(!hasOxygen(player) && !hasOxygen(netMove)){
     player.oxygen -= 1;
     if(player.oxygen < 0){
@@ -72,7 +86,7 @@ const tryMovePlayer = (direction, cameraBox, map) => {
       );
       Point.set(player, map.start);
       player.oxygen = 10;
-      Camera.updateTracking(camera, Rectangle.make(0,0,map.width, map.height));
+      Camera.updateTracking(camera, Rectangle.make(0,0,_map.width, _map.height));
       return false;
     }
   } else {
@@ -80,9 +94,21 @@ const tryMovePlayer = (direction, cameraBox, map) => {
   }
   Point.addTo(player, direction);
 
-  if(Point.equal(player, map.exit)){
+  if(Point.equal(player, _map.exit)){
+    console.log("test");
+    levelIndex = (levelIndex + 1) % levels.length;
+    console.log(levelIndex);
+    console.log(levels);
+    map = levels[levelIndex];
+    _map = map;
+    levelBank.printMap(_map);
+    console.log(_map);
     renderSidebar("You have won... for now.")
-    Point.set(player, map.start);
+    _map.player.oxygen = _map.player.maxOxygen;
+    Point.set(map.player, map.start);
+    camera = Camera.make(Rectangle.make(0,0,30, 10), map.player);
+    Camera.updateTracking(camera, Rectangle.make(0,0,_map.width, _map.height));
+    renderMap(_map, screen, camera.frame);
   }
 
 

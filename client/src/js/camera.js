@@ -8,10 +8,8 @@ const make = (frame, target) => {
 }
 
 const updateTracking = (camera, bounds)  => {
-  console.log(camera, bounds);
   if(camera.target){
     if(!Rectangle.containsPoint(bounds, camera.target)){
-      debugger;
       console.log("Cannot track target")
       console.log(bounds, camera, camera.target)
       return false;

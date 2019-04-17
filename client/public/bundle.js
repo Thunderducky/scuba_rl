@@ -94,7 +94,201 @@
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-eval("__webpack_require__.r(__webpack_exports__);\n/* harmony import */ var _utils__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./utils */ \"./client/src/js/utils.js\");\n/* harmony import */ var _mapMaker__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./mapMaker */ \"./client/src/js/mapMaker.js\");\n/* harmony import */ var _mapRenderer__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./mapRenderer */ \"./client/src/js/mapRenderer.js\");\n/* harmony import */ var _mapRenderer__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(_mapRenderer__WEBPACK_IMPORTED_MODULE_2__);\n/* harmony import */ var _text__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./text */ \"./client/src/js/text.js\");\n/* harmony import */ var _camera__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./camera */ \"./client/src/js/camera.js\");\n/* harmony import */ var _shapes__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./shapes */ \"./client/src/js/shapes/index.js\");\n/* harmony import */ var _levels__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./levels */ \"./client/src/js/levels/index.js\");\n\n\n\n\n\n// for some reason the normal import isn't working :P\n\nconst { Rectangle, Point } = _shapes__WEBPACK_IMPORTED_MODULE_5__[\"default\"];\n\n\nconsole.log(_levels__WEBPACK_IMPORTED_MODULE_6__[\"default\"]);\nconst screen = Object(_utils__WEBPACK_IMPORTED_MODULE_0__[\"$\"])(\"#scuba\");\nconst statusbar = Object(_utils__WEBPACK_IMPORTED_MODULE_0__[\"$\"])(\"#status_bar\");\nconst sidebarTarget = Object(_utils__WEBPACK_IMPORTED_MODULE_0__[\"$\"])(\"#sidebar_target\");\n\nconst map = _levels__WEBPACK_IMPORTED_MODULE_6__[\"default\"].levels.test_level; //makeMap({width:50,height:20});\nconsole.log(map);\nconst camera = _camera__WEBPACK_IMPORTED_MODULE_4__[\"default\"].make(Rectangle.make(0, 0, 30, 10), map.player);\nconst renderStatus = (map, target) => {\n  target.innerHTML = `Oxygen: ${map.player.oxygen}/ ${map.player.maxOxygen}`;\n};\n\nconst renderSidebar = message => {\n  sidebarTarget.innerHTML = message;\n};\n_camera__WEBPACK_IMPORTED_MODULE_4__[\"default\"].updateTracking(camera, Rectangle.make(0, 0, map.width, map.height));\nObject(_mapRenderer__WEBPACK_IMPORTED_MODULE_2__[\"renderMap\"])(map, screen, camera.frame);\nrenderStatus(map, statusbar);\nrenderSidebar(_text__WEBPACK_IMPORTED_MODULE_3__[\"START\"]);\n\nconst tryMovePlayer = (direction, cameraBox, map) => {\n  const { player } = map;\n  const mapBox = Rectangle.make(0, 0, map.width, map.height);\n  const netMove = Point.add(player, direction);\n\n  const source = map.getCell(player.x, player.y);\n  const destination = map.getCell(netMove.x, netMove.y);\n\n  // destination blockers\n  if (!Rectangle.containsPoint(mapBox, netMove)) {\n    renderSidebar(_text__WEBPACK_IMPORTED_MODULE_3__[\"OUT_OF_BOUNDS\"]);\n    return false;\n  }\n  if (destination.wall) {\n    renderSidebar(_text__WEBPACK_IMPORTED_MODULE_3__[\"WALL\"]);\n    return false;\n  }\n\n  const hasFloor = (x, y) => {\n    const lower = map.getCell(x, y + 1);\n    return lower.wall || lower.ladder;\n  };\n\n  if (source.air && !hasFloor(player.x, player.y) && direction.y <= 0) {\n    // potentially allow a diagnol in the future\n    renderSidebar(_text__WEBPACK_IMPORTED_MODULE_3__[\"AIR_WALK\"]);\n    return false;\n  }\n  if (source.air && direction.y < 0) {\n    renderSidebar(_text__WEBPACK_IMPORTED_MODULE_3__[\"NO_JUMP\"]);\n    return false;\n  }\n\n  // HANDLE OXYGEN SUPPLY\n  const hasOxygen = p => [map.getCell(p.x, p.y), ...map.getCellNeighbors(p.x, p.y)].some(cell => !cell.water && !cell.wall);\n  if (!hasOxygen(player) && !hasOxygen(netMove)) {\n    player.oxygen -= 1;\n    if (player.oxygen < 0) {\n      renderSidebar(`\n        You awaken where you once began\n        perhaps wiser than before...`);\n      Point.set(player, map.start);\n      player.oxygen = 10;\n      _camera__WEBPACK_IMPORTED_MODULE_4__[\"default\"].updateTracking(camera, Rectangle.make(0, 0, map.width, map.height));\n      return false;\n    }\n  } else {\n    player.oxygen = player.maxOxygen;\n  }\n  Point.addTo(player, direction);\n\n  if (Point.equal(player, map.exit)) {\n    renderSidebar(\"You have won... for now.\");\n    Point.set(player, map.start);\n  }\n\n  // tryMoveCamera(direction, cameraBox, map);\n  _camera__WEBPACK_IMPORTED_MODULE_4__[\"default\"].updateTracking(camera, Rectangle.make(0, 0, map.width, map.height));\n  return true;\n};\n\n// UI SECTION\ndocument.onkeydown = function (e) {\n  const preventDefaultList = [\"ArrowLeft\", \"ArrowRight\", \"ArrowUp\", \"ArrowDown\"];\n  if (preventDefaultList.includes(e.key)) {\n    e.preventDefault();\n  }\n  switch (e.key) {\n    case \"ArrowLeft\":\n      tryMovePlayer(Point.make(-1, 0), camera.frame, map);\n      break;\n    case \"ArrowRight\":\n      tryMovePlayer(Point.make(1, 0), camera.frame, map);\n      break;\n    case \"ArrowUp\":\n      tryMovePlayer(Point.make(0, -1), camera.frame, map);\n      break;\n    case \"ArrowDown\":\n      tryMovePlayer(Point.make(0, 1), camera.frame, map);\n      break;\n    default:\n      console.log(\"unused key\");\n  }\n  Object(_mapRenderer__WEBPACK_IMPORTED_MODULE_2__[\"renderMap\"])(map, screen, camera.frame);\n  renderStatus(map, statusbar);\n};\n\n// Helper Function\ndocument.onclick = function (e) {\n  const rootEls = e.path.filter(el => el.className === \"cell\");\n  if (rootEls.length > 0) {\n    const rootEl = rootEls[0];\n    const x = +rootEl.getAttribute(\"x\");\n    const y = +rootEl.getAttribute(\"y\");\n    console.log(map.getCell(x, y));\n    if (x === map.player.x && y === map.player.y) {\n      console.log(\"Player\");\n      console.log(map.player);\n    }\n  }\n};\n\n// TODO: FIXME!\ndocument.onmouseover = function (e) {\n  // const rootEls = e.path.filter(el => el.className === \"cell\");\n  // let result = \"\";\n  // if(rootEls.length > 0){\n  //   const rootEl = rootEls[0];\n  //   const x = +rootEl.getAttribute(\"x\") - camera.frame.x;\n  //   const y = +rootEl.getAttribute(\"y\") - camera.frame.y;\n  //   console.log(map.getCell(x, y));\n  //\n  //   const cell = map.getCell(x,y);\n  //   if(cell.air){\n  //     result += \" Air \"\n  //   }\n  //   else if(cell.ladder){\n  //     result += \" Ladder \"\n  //   }\n  //   else if(cell.water){\n  //     result += \" Water \"\n  //   }\n  //   else if(cell.wall){\n  //     result += \" Wall \"\n  //   }\n  //   if(x === map.player.x && y === map.player.y){\n  //     result += \"- Player\";\n  //   }\n  //   if(x === map.exit.x && y === map.exit.y){\n  //     result += \"- Exit\";\n  //   }\n  // }\n  // statusbar.innerHTML = result;\n};\n\n//# sourceURL=webpack:///./client/src/js/app.js?");
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _utils__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./utils */ "./client/src/js/utils.js");
+/* harmony import */ var _mapMaker__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./mapMaker */ "./client/src/js/mapMaker.js");
+/* harmony import */ var _mapRenderer__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./mapRenderer */ "./client/src/js/mapRenderer.js");
+/* harmony import */ var _mapRenderer__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(_mapRenderer__WEBPACK_IMPORTED_MODULE_2__);
+/* harmony import */ var _text__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./text */ "./client/src/js/text.js");
+/* harmony import */ var _camera__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./camera */ "./client/src/js/camera.js");
+/* harmony import */ var _shapes__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./shapes */ "./client/src/js/shapes/index.js");
+/* harmony import */ var _levels__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./levels */ "./client/src/js/levels/index.js");
+
+
+
+
+
+// for some reason the normal import isn't working :P
+
+const { Rectangle, Point } = _shapes__WEBPACK_IMPORTED_MODULE_5__["default"];
+
+
+
+const screen = Object(_utils__WEBPACK_IMPORTED_MODULE_0__["$"])("#scuba");
+const statusbar = Object(_utils__WEBPACK_IMPORTED_MODULE_0__["$"])("#status_bar");
+const sidebarTarget = Object(_utils__WEBPACK_IMPORTED_MODULE_0__["$"])("#sidebar_target");
+
+const levels = [];
+for (let l in _levels__WEBPACK_IMPORTED_MODULE_6__["default"].levels) {
+  console.log(l);
+  levels.push(_levels__WEBPACK_IMPORTED_MODULE_6__["default"].levels[l]);
+}
+console.log(levels);
+
+const urlParams = new URLSearchParams(window.location.search);
+let levelIndex = +urlParams.get('level') || 0;
+levelIndex = Math.min(levelIndex, levels.length - 1);
+
+let map = levels[levelIndex]; //levels[levelIndex]; //makeMap({width:50,height:20});
+let camera = _camera__WEBPACK_IMPORTED_MODULE_4__["default"].make(Rectangle.make(0, 0, 30, 10), map.player);
+const renderStatus = (map, target) => {
+  target.innerHTML = `Oxygen: ${map.player.oxygen}/ ${map.player.maxOxygen}`;
+};
+
+const renderSidebar = message => {
+  sidebarTarget.innerHTML = message;
+};
+_camera__WEBPACK_IMPORTED_MODULE_4__["default"].updateTracking(camera, Rectangle.make(0, 0, map.width, map.height));
+Object(_mapRenderer__WEBPACK_IMPORTED_MODULE_2__["renderMap"])(map, screen, camera.frame);
+renderStatus(map, statusbar);
+renderSidebar(_text__WEBPACK_IMPORTED_MODULE_3__["START"]);
+
+const tryMovePlayer = (direction, cameraBox, _map) => {
+  const { player } = _map;
+  const mapBox = Rectangle.make(0, 0, _map.width, _map.height);
+  const netMove = Point.add(player, direction);
+
+  const source = _map.getCell(player.x, player.y);
+  const destination = _map.getCell(netMove.x, netMove.y);
+
+  // destination blockers
+  if (!Rectangle.containsPoint(mapBox, netMove)) {
+    renderSidebar(_text__WEBPACK_IMPORTED_MODULE_3__["OUT_OF_BOUNDS"]);
+    return false;
+  }
+  if (destination.wall) {
+    renderSidebar(_text__WEBPACK_IMPORTED_MODULE_3__["WALL"]);
+    return false;
+  }
+
+  const hasFloor = (x, y) => {
+    const lower = _map.getCell(x, y + 1);
+    return lower.wall || lower.ladder;
+  };
+
+  if (source.air && !hasFloor(player.x, player.y) && direction.y <= 0) {
+    // potentially allow a diagnol in the future
+    renderSidebar(_text__WEBPACK_IMPORTED_MODULE_3__["AIR_WALK"]);
+    return false;
+  }
+  if (source.air && direction.y < 0) {
+    renderSidebar(_text__WEBPACK_IMPORTED_MODULE_3__["NO_JUMP"]);
+    return false;
+  }
+
+  // HANDLE OXYGEN SUPPLY
+  const hasOxygen = p => [_map.getCell(p.x, p.y), ..._map.getCellNeighbors(p.x, p.y)].some(cell => !cell.water && !cell.wall);
+  if (!hasOxygen(player) && !hasOxygen(netMove)) {
+    player.oxygen -= 1;
+    if (player.oxygen < 0) {
+      renderSidebar(`
+        You awaken where you once began
+        perhaps wiser than before...`);
+      Point.set(player, map.start);
+      player.oxygen = 10;
+      _camera__WEBPACK_IMPORTED_MODULE_4__["default"].updateTracking(camera, Rectangle.make(0, 0, _map.width, _map.height));
+      return false;
+    }
+  } else {
+    player.oxygen = player.maxOxygen;
+  }
+  Point.addTo(player, direction);
+
+  if (Point.equal(player, _map.exit)) {
+    console.log("test");
+    levelIndex = (levelIndex + 1) % levels.length;
+    console.log(levelIndex);
+    console.log(levels);
+    map = levels[levelIndex];
+    _map = map;
+    _levels__WEBPACK_IMPORTED_MODULE_6__["default"].printMap(_map);
+    console.log(_map);
+    renderSidebar("You have won... for now.");
+    _map.player.oxygen = _map.player.maxOxygen;
+    Point.set(map.player, map.start);
+    camera = _camera__WEBPACK_IMPORTED_MODULE_4__["default"].make(Rectangle.make(0, 0, 30, 10), map.player);
+    _camera__WEBPACK_IMPORTED_MODULE_4__["default"].updateTracking(camera, Rectangle.make(0, 0, _map.width, _map.height));
+    Object(_mapRenderer__WEBPACK_IMPORTED_MODULE_2__["renderMap"])(_map, screen, camera.frame);
+  }
+
+  // tryMoveCamera(direction, cameraBox, map);
+  _camera__WEBPACK_IMPORTED_MODULE_4__["default"].updateTracking(camera, Rectangle.make(0, 0, map.width, map.height));
+  return true;
+};
+
+// UI SECTION
+document.onkeydown = function (e) {
+  const preventDefaultList = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
+  if (preventDefaultList.includes(e.key)) {
+    e.preventDefault();
+  }
+  switch (e.key) {
+    case "ArrowLeft":
+      tryMovePlayer(Point.make(-1, 0), camera.frame, map);
+      break;
+    case "ArrowRight":
+      tryMovePlayer(Point.make(1, 0), camera.frame, map);
+      break;
+    case "ArrowUp":
+      tryMovePlayer(Point.make(0, -1), camera.frame, map);
+      break;
+    case "ArrowDown":
+      tryMovePlayer(Point.make(0, 1), camera.frame, map);
+      break;
+    default:
+      console.log("unused key");
+  }
+  Object(_mapRenderer__WEBPACK_IMPORTED_MODULE_2__["renderMap"])(map, screen, camera.frame);
+  renderStatus(map, statusbar);
+};
+
+// Helper Function
+document.onclick = function (e) {
+  const rootEls = e.path.filter(el => el.className === "cell");
+  if (rootEls.length > 0) {
+    const rootEl = rootEls[0];
+    const x = +rootEl.getAttribute("x");
+    const y = +rootEl.getAttribute("y");
+    console.log(map.getCell(x, y));
+    if (x === map.player.x && y === map.player.y) {
+      console.log("Player");
+      console.log(map.player);
+    }
+  }
+};
+
+// TODO: FIXME!
+document.onmouseover = function (e) {
+  // const rootEls = e.path.filter(el => el.className === "cell");
+  // let result = "";
+  // if(rootEls.length > 0){
+  //   const rootEl = rootEls[0];
+  //   const x = +rootEl.getAttribute("x") - camera.frame.x;
+  //   const y = +rootEl.getAttribute("y") - camera.frame.y;
+  //   console.log(map.getCell(x, y));
+  //
+  //   const cell = map.getCell(x,y);
+  //   if(cell.air){
+  //     result += " Air "
+  //   }
+  //   else if(cell.ladder){
+  //     result += " Ladder "
+  //   }
+  //   else if(cell.water){
+  //     result += " Water "
+  //   }
+  //   else if(cell.wall){
+  //     result += " Wall "
+  //   }
+  //   if(x === map.player.x && y === map.player.y){
+  //     result += "- Player";
+  //   }
+  //   if(x === map.exit.x && y === map.exit.y){
+  //     result += "- Exit";
+  //   }
+  // }
+  // statusbar.innerHTML = result;
+};
 
 /***/ }),
 
@@ -106,7 +300,42 @@ eval("__webpack_require__.r(__webpack_exports__);\n/* harmony import */ var _uti
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-eval("__webpack_require__.r(__webpack_exports__);\n/* harmony import */ var _shapes__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./shapes */ \"./client/src/js/shapes/index.js\");\n\nconst { Rectangle, Point } = _shapes__WEBPACK_IMPORTED_MODULE_0__[\"default\"];\nconst make = (frame, target) => {\n  return {\n    frame: Rectangle.copy(frame),\n    target // should be a point, but doesn't have to be\n  };\n};\n\nconst updateTracking = (camera, bounds) => {\n  console.log(camera, bounds);\n  if (camera.target) {\n    if (!Rectangle.containsPoint(bounds, camera.target)) {\n      debugger;\n      console.log(\"Cannot track target\");\n      console.log(bounds, camera, camera.target);\n      return false;\n    }\n\n    Rectangle.setCenter(camera.frame, camera.target);\n\n    // Avoid problems with cameras with uneven\n    camera.frame.x = Math.floor(camera.frame.x);\n    camera.frame.y = Math.floor(camera.frame.y);\n\n    Rectangle.clampRectangle(bounds, camera.frame);\n    return true;\n  } else {\n    return false;\n  }\n};\n\n/* harmony default export */ __webpack_exports__[\"default\"] = ({\n  make,\n  updateTracking\n});\n\n//# sourceURL=webpack:///./client/src/js/camera.js?");
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _shapes__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./shapes */ "./client/src/js/shapes/index.js");
+
+const { Rectangle, Point } = _shapes__WEBPACK_IMPORTED_MODULE_0__["default"];
+const make = (frame, target) => {
+  return {
+    frame: Rectangle.copy(frame),
+    target // should be a point, but doesn't have to be
+  };
+};
+
+const updateTracking = (camera, bounds) => {
+  if (camera.target) {
+    if (!Rectangle.containsPoint(bounds, camera.target)) {
+      console.log("Cannot track target");
+      console.log(bounds, camera, camera.target);
+      return false;
+    }
+
+    Rectangle.setCenter(camera.frame, camera.target);
+
+    // Avoid problems with cameras with uneven
+    camera.frame.x = Math.floor(camera.frame.x);
+    camera.frame.y = Math.floor(camera.frame.y);
+
+    Rectangle.clampRectangle(bounds, camera.frame);
+    return true;
+  } else {
+    return false;
+  }
+};
+
+/* harmony default export */ __webpack_exports__["default"] = ({
+  make,
+  updateTracking
+});
 
 /***/ }),
 
@@ -118,7 +347,78 @@ eval("__webpack_require__.r(__webpack_exports__);\n/* harmony import */ var _sha
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-eval("__webpack_require__.r(__webpack_exports__);\n/* harmony import */ var _mapMaker__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../mapMaker */ \"./client/src/js/mapMaker.js\");\n/* harmony import */ var _utils__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../utils */ \"./client/src/js/utils.js\");\n/* harmony import */ var _shapes__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../shapes */ \"./client/src/js/shapes/index.js\");\n/* harmony import */ var _test_level__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./test_level */ \"./client/src/js/levels/test_level.js\");\n/* harmony import */ var _test_level2__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./test_level2 */ \"./client/src/js/levels/test_level2.js\");\n/* harmony import */ var _test_level3__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./test_level3 */ \"./client/src/js/levels/test_level3.js\");\n\n\n\n// shove an eval in here? probably wouldn't work :P\n\n\n\nconsole.log(_test_level__WEBPACK_IMPORTED_MODULE_3__);\n\nconst stringToMap = str => {\n  const lines = str.trim().split('\\n');\n  const map = Object(_mapMaker__WEBPACK_IMPORTED_MODULE_0__[\"makeMap\"])({ height: lines.length, width: lines[0].replace(/\\s/g, '').length });\n  const all = map.getAllFlat();\n  const clearedLines = str.replace(/\\s/g, '');\n  for (let i = 0; i < clearedLines.length; i++) {\n    const letter = clearedLines[i];\n    const cell = all[i];\n    switch (letter) {\n      case '~':\n        Object(_mapMaker__WEBPACK_IMPORTED_MODULE_0__[\"setWater\"])(cell);\n        break;\n      case '.':\n        Object(_mapMaker__WEBPACK_IMPORTED_MODULE_0__[\"setAir\"])(cell);\n        break;\n      case 'H':\n        Object(_mapMaker__WEBPACK_IMPORTED_MODULE_0__[\"setLadder\"])(cell);\n        break;\n      case '=':\n        Object(_mapMaker__WEBPACK_IMPORTED_MODULE_0__[\"setWall\"])(cell);\n        break;\n      default:\n        Object(_mapMaker__WEBPACK_IMPORTED_MODULE_0__[\"setAir\"])(cell);\n        break;\n    }\n  }\n  return map;\n};\n\nconst buildMap = level => {\n  const map = stringToMap(level.levelData);\n  _shapes__WEBPACK_IMPORTED_MODULE_2__[\"default\"].Point.set(map.start, level.start);\n  _shapes__WEBPACK_IMPORTED_MODULE_2__[\"default\"].Point.set(map.exit, level.exit);\n  _shapes__WEBPACK_IMPORTED_MODULE_2__[\"default\"].Point.set(map.player, map.start);\n  return map;\n};\n\nconst printMap = map => {\n  console.log(\"MAP\");\n  map.getAll().forEach(line => {\n    console.log(line.map(c => c.character).join(\"\"));\n  });\n};\n\n// build more level stuff\n\n/* harmony default export */ __webpack_exports__[\"default\"] = ({\n  stringToMap,\n  buildMap,\n  printMap,\n  levels: {\n    test_level: buildMap(_test_level__WEBPACK_IMPORTED_MODULE_3__),\n    test_level2: buildMap(_test_level2__WEBPACK_IMPORTED_MODULE_4__),\n    test_level3: buildMap(_test_level3__WEBPACK_IMPORTED_MODULE_5__)\n  }\n});\n\n//# sourceURL=webpack:///./client/src/js/levels/index.js?");
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _mapMaker__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../mapMaker */ "./client/src/js/mapMaker.js");
+/* harmony import */ var _utils__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../utils */ "./client/src/js/utils.js");
+/* harmony import */ var _shapes__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../shapes */ "./client/src/js/shapes/index.js");
+/* harmony import */ var _test_level__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./test_level */ "./client/src/js/levels/test_level.js");
+/* harmony import */ var _test_level2__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./test_level2 */ "./client/src/js/levels/test_level2.js");
+/* harmony import */ var _test_level3__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./test_level3 */ "./client/src/js/levels/test_level3.js");
+
+
+
+// shove an eval in here? probably wouldn't work :P
+
+
+
+console.log(_test_level__WEBPACK_IMPORTED_MODULE_3__);
+
+const stringToMap = str => {
+  const lines = str.trim().split('\n');
+  const map = Object(_mapMaker__WEBPACK_IMPORTED_MODULE_0__["makeMap"])({ height: lines.length, width: lines[0].replace(/\s/g, '').length });
+  const all = map.getAllFlat();
+  const clearedLines = str.replace(/\s/g, '');
+  for (let i = 0; i < clearedLines.length; i++) {
+    const letter = clearedLines[i];
+    const cell = all[i];
+    switch (letter) {
+      case '~':
+        Object(_mapMaker__WEBPACK_IMPORTED_MODULE_0__["setWater"])(cell);
+        break;
+      case '.':
+        Object(_mapMaker__WEBPACK_IMPORTED_MODULE_0__["setAir"])(cell);
+        break;
+      case 'H':
+        Object(_mapMaker__WEBPACK_IMPORTED_MODULE_0__["setLadder"])(cell);
+        break;
+      case '=':
+        Object(_mapMaker__WEBPACK_IMPORTED_MODULE_0__["setWall"])(cell);
+        break;
+      default:
+        Object(_mapMaker__WEBPACK_IMPORTED_MODULE_0__["setAir"])(cell);
+        break;
+    }
+  }
+  return map;
+};
+
+const buildMap = level => {
+  const map = stringToMap(level.levelData);
+  _shapes__WEBPACK_IMPORTED_MODULE_2__["default"].Point.set(map.start, level.start);
+  _shapes__WEBPACK_IMPORTED_MODULE_2__["default"].Point.set(map.exit, level.exit);
+  _shapes__WEBPACK_IMPORTED_MODULE_2__["default"].Point.set(map.player, map.start);
+  return map;
+};
+
+const printMap = map => {
+  console.log("MAP");
+  map.getAll().forEach(line => {
+    console.log(line.map(c => c.character).join(""));
+  });
+};
+
+// build more level stuff
+
+/* harmony default export */ __webpack_exports__["default"] = ({
+  stringToMap,
+  buildMap,
+  printMap,
+  levels: {
+    test_level: buildMap(_test_level__WEBPACK_IMPORTED_MODULE_3__),
+    test_level2: buildMap(_test_level2__WEBPACK_IMPORTED_MODULE_4__),
+    test_level3: buildMap(_test_level3__WEBPACK_IMPORTED_MODULE_5__)
+  }
+});
 
 /***/ }),
 
@@ -130,7 +430,26 @@ eval("__webpack_require__.r(__webpack_exports__);\n/* harmony import */ var _map
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-eval("__webpack_require__.r(__webpack_exports__);\n/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, \"levelData\", function() { return levelData; });\n/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, \"start\", function() { return start; });\n/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, \"exit\", function() { return exit; });\nconst levelData = `\n  ................................................................\n  ................................................................\n  ................................................................\n  ................................................................\n  ................................................................\n  ................................................................\n  ................................................................\n  ................................................................\n  ................................................................\n  ================================================================\n  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n`;\nconst start = { x: 2, y: 8 };\nconst exit = { x: 25, y: 8 };\n\n//# sourceURL=webpack:///./client/src/js/levels/test_level.js?");
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "levelData", function() { return levelData; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "start", function() { return start; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "exit", function() { return exit; });
+const levelData = `
+  ................................................................
+  ................................................................
+  ................................................................
+  ................................................................
+  ................................................................
+  ................................................................
+  ................................................................
+  ................................................................
+  ................................................................
+  ================================================================
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+`;
+const start = { x: 2, y: 8 };
+const exit = { x: 25, y: 8 };
 
 /***/ }),
 
@@ -142,7 +461,27 @@ eval("__webpack_require__.r(__webpack_exports__);\n/* harmony export (binding) *
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-eval("__webpack_require__.r(__webpack_exports__);\n/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, \"levelData\", function() { return levelData; });\n/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, \"start\", function() { return start; });\n/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, \"exit\", function() { return exit; });\nconst levelData = `\n  ................................................................\n  ................................................................\n  ................................................................\n  ................................................................\n  ................................................................\n  ................................................................\n  ................................................................\n  ................H===............................................\n  ................H===...!........................................\n  ================================================================\n  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n`;\n\nconst start = { x: 2, y: 8 };\nconst exit = { x: 20, y: 8 };\n\n//# sourceURL=webpack:///./client/src/js/levels/test_level2.js?");
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "levelData", function() { return levelData; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "start", function() { return start; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "exit", function() { return exit; });
+const levelData = `
+  ................................................................
+  ................................................................
+  ................................................................
+  ................................................................
+  ................................................................
+  ................................................................
+  ................................................................
+  ................H===............................................
+  ................H===...!........................................
+  ================================================================
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+`;
+
+const start = { x: 2, y: 8 };
+const exit = { x: 20, y: 8 };
 
 /***/ }),
 
@@ -154,7 +493,29 @@ eval("__webpack_require__.r(__webpack_exports__);\n/* harmony export (binding) *
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-eval("__webpack_require__.r(__webpack_exports__);\n/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, \"levelData\", function() { return levelData; });\n/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, \"start\", function() { return start; });\n/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, \"exit\", function() { return exit; });\nconst levelData = `\n  ................................\n  .==H==..........................\n  ...H.....======H=====...........\n  ...H...........H................\n  ..====H==......H................\n  ......H........H................\n  ......H........H.....=H.........\n  ~~~~~~H~~~~~~~~H~~~~~=H~~~~~~~~~\n  ~~~~~~~~~~~~~~~~~~~~~=~~~~~~~~~~\n  ~~~~~~~~~~~~~~~~~~~~~=~~~~~~~~~~\n  ~~~~~~~~~~~~~~~~~~~~~=~~~~~~~~~~\n  ~~~~~~~~~~~~~~~~~~~~~=~~~~~~~~~~\n  ~~~~~~H~~~~~~~~H~~~~~=~~~~~~~~~~\n  ~~~~~~~~~~~~~~~~~~~~~=H~~~~~~~~~\n`;\n\nconst start = { x: 2, y: 0 };\nconst exit = { x: 31, y: 13 };\n\n//# sourceURL=webpack:///./client/src/js/levels/test_level3.js?");
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "levelData", function() { return levelData; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "start", function() { return start; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "exit", function() { return exit; });
+const levelData = `
+  ................................
+  .==H==..........................
+  ...H.....======H=====...........
+  ...H...........H................
+  ..====H==......H................
+  ......H........H................
+  ......H........H.....=H.........
+  ~~~~~~H~~~~~~~~H~~~~~=H~~~~~~~~~
+  ~~~~~~~~~~~~~~~~~~~~~=~~~~~~~~~~
+  ~~~~~~~~~~~~~~~~~~~~~=~~~~~~~~~~
+  ~~~~~~~~~~~~~~~~~~~~~=~~~~~~~~~~
+  ~~~~~~~~~~~~~~~~~~~~~=~~~~~~~~~~
+  ~~~~~~H~~~~~~~~H~~~~~=~~~~~~~~~~
+  ~~~~~~~~~~~~~~~~~~~~~=H~~~~~~~~~
+`;
+
+const start = { x: 2, y: 0 };
+const exit = { x: 31, y: 13 };
 
 /***/ }),
 
@@ -166,7 +527,116 @@ eval("__webpack_require__.r(__webpack_exports__);\n/* harmony export (binding) *
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-eval("__webpack_require__.r(__webpack_exports__);\n/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, \"makeCell\", function() { return makeCell; });\n/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, \"setWater\", function() { return setWater; });\n/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, \"setAir\", function() { return setAir; });\n/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, \"setWall\", function() { return setWall; });\n/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, \"setLadder\", function() { return setLadder; });\n/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, \"makeMap\", function() { return makeMap; });\n/* harmony import */ var _utils__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./utils */ \"./client/src/js/utils.js\");\n\nconst makeCell = () => {\n  return {\n    color: \"white\",\n    character: \".\",\n    wall: false,\n    ladder: false,\n    water: false,\n    air: true\n  };\n};\n\nconst zeroTypes = cell => {\n  cell.wall = false, cell.ladder = false, cell.water = false;\n  cell.air = false;\n};\n\nconst setWater = cell => {\n  cell.color = \"blue\";\n  cell.character = \"~\";\n  zeroTypes(cell);\n  cell.water = true;\n  return cell;\n};\nconst setAir = cell => {\n  cell.color = \"white\";\n  cell.character = \".\";\n  zeroTypes(cell);\n  cell.air = true;\n  return cell;\n};\nconst setWall = cell => {\n  cell.color = \"green\";\n  cell.character = \"=\";\n  zeroTypes(cell);\n  cell.wall = true;\n  return cell;\n};\n\nconst setLadder = cell => {\n  cell.color = \"red\";\n  cell.character = \"H\";\n  zeroTypes(cell);\n  cell.ladder = true;\n  return cell;\n};\n\nconst makeMap = params => {\n  const cells = [];\n  for (let y = 0; y < params.height; y++) {\n    const line = [];\n    for (let x = 0; x < params.width; x++) {\n      line.push(makeCell());\n    }\n    cells.push(line);\n  }\n  return {\n    _cells: cells,\n    start: {\n      x: 4,\n      y: 2\n    },\n    exit: {\n      x: 10,\n      y: 10\n    },\n    player: {\n      x: 4,\n      y: 2,\n      oxygen: 10,\n      maxOxygen: 10\n    },\n    width: params.width,\n    height: params.height,\n    getPatch: function (box) {\n      return this._cells.filter((_, y) => y >= box.y && y < box.y + box.height) // calculate in y range)\n      .map(line => line.slice(box.x, box.x + box.width));\n    },\n    getCell: function (x, y) {\n      if (y < 0 || y >= this._cells.length) {\n        return undefined;\n      }\n      return this._cells[y][x];\n    },\n    getCellNeighbors: function (x, y) {\n      const neighbors = [this.getCell(x, y - 1), this.getCell(x + 1, y), this.getCell(x, y + 1), this.getCell(x - 1, y)];\n      return neighbors.filter(n => !!n);\n    },\n    getPatchFlat: function (box) {\n      return Object(_utils__WEBPACK_IMPORTED_MODULE_0__[\"flatten\"])(this.getPatch(box));\n    },\n    getAll: function () {\n      return this._cells.map(l => l);\n    },\n    getAllFlat: function () {\n      return Object(_utils__WEBPACK_IMPORTED_MODULE_0__[\"flatten\"])(this._cells.map(l => l));\n    },\n    getGraphTraverser: function () {\n      throw \"Not Implemented Yet\";\n    }\n  };\n};\n\n//# sourceURL=webpack:///./client/src/js/mapMaker.js?");
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "makeCell", function() { return makeCell; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "setWater", function() { return setWater; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "setAir", function() { return setAir; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "setWall", function() { return setWall; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "setLadder", function() { return setLadder; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "makeMap", function() { return makeMap; });
+/* harmony import */ var _utils__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./utils */ "./client/src/js/utils.js");
+
+const makeCell = () => {
+  return {
+    color: "white",
+    character: ".",
+    wall: false,
+    ladder: false,
+    water: false,
+    air: true
+  };
+};
+
+const zeroTypes = cell => {
+  cell.wall = false, cell.ladder = false, cell.water = false;
+  cell.air = false;
+};
+
+const setWater = cell => {
+  cell.color = "blue";
+  cell.character = "~";
+  zeroTypes(cell);
+  cell.water = true;
+  return cell;
+};
+const setAir = cell => {
+  cell.color = "white";
+  cell.character = ".";
+  zeroTypes(cell);
+  cell.air = true;
+  return cell;
+};
+const setWall = cell => {
+  cell.color = "green";
+  cell.character = "=";
+  zeroTypes(cell);
+  cell.wall = true;
+  return cell;
+};
+
+const setLadder = cell => {
+  cell.color = "red";
+  cell.character = "H";
+  zeroTypes(cell);
+  cell.ladder = true;
+  return cell;
+};
+
+const makeMap = params => {
+  const cells = [];
+  for (let y = 0; y < params.height; y++) {
+    const line = [];
+    for (let x = 0; x < params.width; x++) {
+      line.push(makeCell());
+    }
+    cells.push(line);
+  }
+  return {
+    _cells: cells,
+    start: {
+      x: 4,
+      y: 2
+    },
+    exit: {
+      x: 10,
+      y: 10
+    },
+    player: {
+      x: 4,
+      y: 2,
+      oxygen: 10,
+      maxOxygen: 10
+    },
+    width: params.width,
+    height: params.height,
+    getPatch: function (box) {
+      return this._cells.filter((_, y) => y >= box.y && y < box.y + box.height) // calculate in y range)
+      .map(line => line.slice(box.x, box.x + box.width));
+    },
+    getCell: function (x, y) {
+      if (y < 0 || y >= this._cells.length) {
+        return undefined;
+      }
+      return this._cells[y][x];
+    },
+    getCellNeighbors: function (x, y) {
+      const neighbors = [this.getCell(x, y - 1), this.getCell(x + 1, y), this.getCell(x, y + 1), this.getCell(x - 1, y)];
+      return neighbors.filter(n => !!n);
+    },
+    getPatchFlat: function (box) {
+      return Object(_utils__WEBPACK_IMPORTED_MODULE_0__["flatten"])(this.getPatch(box));
+    },
+    getAll: function () {
+      return this._cells.map(l => l);
+    },
+    getAllFlat: function () {
+      return Object(_utils__WEBPACK_IMPORTED_MODULE_0__["flatten"])(this._cells.map(l => l));
+    },
+    getGraphTraverser: function () {
+      throw "Not Implemented Yet";
+    }
+  };
+};
 
 /***/ }),
 
@@ -177,7 +647,32 @@ eval("__webpack_require__.r(__webpack_exports__);\n/* harmony export (binding) *
 /*! no static exports found */
 /***/ (function(module, exports) {
 
-eval("// We'll reorganize this at some point\n\n// LOTS OF REFACTOR TO DO\nconst _renderCell = (map, cell, x, y, cameraX = 0, cameraY = 0) => {\n  if (map.player.x === x + cameraX && map.player.y === y + cameraY) {\n    return `<span class=\"cell\"  x=\"${x}\" y=\"${y}\" style=\"color:yellow\">@</span>`;\n  } else if (map.exit.x === x + cameraX && map.exit.y === y + cameraY) {\n    return `<span class=\"cell\"  x=\"${x}\" y=\"${y}\" style=\"color:yellow\">!</span>`;\n  } else {\n    return `<span class=\"cell\" x=\"${x}\" y=\"${y}\" style=\"color:${cell.color}\">${cell.character}</span>`;\n  }\n};\n\nconst renderMap = (map, target, cameraBox) => {\n  const renderCells = cameraBox === undefined ? map.getAll() : map.getPatch(cameraBox);\n  cameraBox = cameraBox || {};\n  cameraBox.x = cameraBox.x || 0;\n  cameraBox.y = cameraBox.y || 0;\n  target.innerHTML = renderCells.map((line, y) => {\n    return line.map((c, x) => _renderCell(map, c, x, y, cameraBox.x, cameraBox.y)).join('');\n  }).join('\\n');\n};\n\nmodule.exports = {\n  renderMap\n};\n\n//# sourceURL=webpack:///./client/src/js/mapRenderer.js?");
+// We'll reorganize this at some point
+
+// LOTS OF REFACTOR TO DO
+const _renderCell = (map, cell, x, y, cameraX = 0, cameraY = 0) => {
+  if (map.player.x === x + cameraX && map.player.y === y + cameraY) {
+    return `<span class="cell"  x="${x}" y="${y}" style="color:yellow">@</span>`;
+  } else if (map.exit.x === x + cameraX && map.exit.y === y + cameraY) {
+    return `<span class="cell"  x="${x}" y="${y}" style="color:yellow">!</span>`;
+  } else {
+    return `<span class="cell" x="${x}" y="${y}" style="color:${cell.color}">${cell.character}</span>`;
+  }
+};
+
+const renderMap = (map, target, cameraBox) => {
+  const renderCells = cameraBox === undefined ? map.getAll() : map.getPatch(cameraBox);
+  cameraBox = cameraBox || {};
+  cameraBox.x = cameraBox.x || 0;
+  cameraBox.y = cameraBox.y || 0;
+  target.innerHTML = renderCells.map((line, y) => {
+    return line.map((c, x) => _renderCell(map, c, x, y, cameraBox.x, cameraBox.y)).join('');
+  }).join('\n');
+};
+
+module.exports = {
+  renderMap
+};
 
 /***/ }),
 
@@ -189,7 +684,44 @@ eval("// We'll reorganize this at some point\n\n// LOTS OF REFACTOR TO DO\nconst
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-eval("__webpack_require__.r(__webpack_exports__);\nconst make = (x, y) => {\n  return { x, y };\n};\nconst copy = p => make(p.x, p.y);\n\nconst set = (changed, value) => {\n  changed.x = value.x;\n  changed.y = value.y;\n  return changed;\n};\nconst add = (a, b) => {\n  return make(a.x + b.x, a.y + b.y);\n};\n\nconst addTo = (changed, value) => {\n  changed.x += value.x;\n  changed.y += value.y;\n  return changed;\n};\n\nconst from = obj => {\n  return make(obj.x, obj.y);\n};\n\nconst equal = (a, b) => {\n  return a.x === b.x && a.y === b.y;\n};\n\n/* harmony default export */ __webpack_exports__[\"default\"] = ({\n  make,\n  equal,\n  set,\n  copy,\n  from,\n  add,\n  addTo\n});\n\n//# sourceURL=webpack:///./client/src/js/shapes/Point.js?");
+__webpack_require__.r(__webpack_exports__);
+const make = (x, y) => {
+  return { x, y };
+};
+const copy = p => make(p.x, p.y);
+
+const set = (changed, value) => {
+  changed.x = value.x;
+  changed.y = value.y;
+  return changed;
+};
+const add = (a, b) => {
+  return make(a.x + b.x, a.y + b.y);
+};
+
+const addTo = (changed, value) => {
+  changed.x += value.x;
+  changed.y += value.y;
+  return changed;
+};
+
+const from = obj => {
+  return make(obj.x, obj.y);
+};
+
+const equal = (a, b) => {
+  return a.x === b.x && a.y === b.y;
+};
+
+/* harmony default export */ __webpack_exports__["default"] = ({
+  make,
+  equal,
+  set,
+  copy,
+  from,
+  add,
+  addTo
+});
 
 /***/ }),
 
@@ -201,7 +733,24 @@ eval("__webpack_require__.r(__webpack_exports__);\nconst make = (x, y) => {\n  r
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-eval("__webpack_require__.r(__webpack_exports__);\n/* harmony import */ var _rectangle__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./rectangle */ \"./client/src/js/shapes/rectangle.js\");\n/* harmony import */ var _point__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./point */ \"./client/src/js/shapes/point.js\");\n// const pMake =  x,y) => { return {x,y}}\n// export const Point = {\n//   make:,\n//   copy: ({x,y}) => { return {x, y}},\n//   set: (dest, source) => { dest.x = source.x; dest.y = source.y; return dest}\n//   add(a,b) => { }\n// };\n// export const Rectangle = {};\n\n\n\n/* harmony default export */ __webpack_exports__[\"default\"] = ({\n  Rectangle: _rectangle__WEBPACK_IMPORTED_MODULE_0__[\"default\"],\n  Point: _point__WEBPACK_IMPORTED_MODULE_1__[\"default\"]\n});\n\n//# sourceURL=webpack:///./client/src/js/shapes/index.js?");
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _rectangle__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./rectangle */ "./client/src/js/shapes/rectangle.js");
+/* harmony import */ var _point__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./point */ "./client/src/js/shapes/point.js");
+// const pMake =  x,y) => { return {x,y}}
+// export const Point = {
+//   make:,
+//   copy: ({x,y}) => { return {x, y}},
+//   set: (dest, source) => { dest.x = source.x; dest.y = source.y; return dest}
+//   add(a,b) => { }
+// };
+// export const Rectangle = {};
+
+
+
+/* harmony default export */ __webpack_exports__["default"] = ({
+  Rectangle: _rectangle__WEBPACK_IMPORTED_MODULE_0__["default"],
+  Point: _point__WEBPACK_IMPORTED_MODULE_1__["default"]
+});
 
 /***/ }),
 
@@ -213,7 +762,44 @@ eval("__webpack_require__.r(__webpack_exports__);\n/* harmony import */ var _rec
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-eval("__webpack_require__.r(__webpack_exports__);\nconst make = (x, y) => {\n  return { x, y };\n};\nconst copy = p => make(p.x, p.y);\n\nconst set = (changed, value) => {\n  changed.x = value.x;\n  changed.y = value.y;\n  return changed;\n};\nconst add = (a, b) => {\n  return make(a.x + b.x, a.y + b.y);\n};\n\nconst addTo = (changed, value) => {\n  changed.x += value.x;\n  changed.y += value.y;\n  return changed;\n};\n\nconst from = obj => {\n  return make(obj.x, obj.y);\n};\n\nconst equal = (a, b) => {\n  return a.x === b.x && a.y === b.y;\n};\n\n/* harmony default export */ __webpack_exports__[\"default\"] = ({\n  make,\n  equal,\n  set,\n  copy,\n  from,\n  add,\n  addTo\n});\n\n//# sourceURL=webpack:///./client/src/js/shapes/point.js?");
+__webpack_require__.r(__webpack_exports__);
+const make = (x, y) => {
+  return { x, y };
+};
+const copy = p => make(p.x, p.y);
+
+const set = (changed, value) => {
+  changed.x = value.x;
+  changed.y = value.y;
+  return changed;
+};
+const add = (a, b) => {
+  return make(a.x + b.x, a.y + b.y);
+};
+
+const addTo = (changed, value) => {
+  changed.x += value.x;
+  changed.y += value.y;
+  return changed;
+};
+
+const from = obj => {
+  return make(obj.x, obj.y);
+};
+
+const equal = (a, b) => {
+  return a.x === b.x && a.y === b.y;
+};
+
+/* harmony default export */ __webpack_exports__["default"] = ({
+  make,
+  equal,
+  set,
+  copy,
+  from,
+  add,
+  addTo
+});
 
 /***/ }),
 
@@ -225,7 +811,76 @@ eval("__webpack_require__.r(__webpack_exports__);\nconst make = (x, y) => {\n  r
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-eval("__webpack_require__.r(__webpack_exports__);\n/* harmony import */ var _Point__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./Point */ \"./client/src/js/shapes/Point.js\");\n\n\nconst clamp = (lower, upper, t) => {\n  if (t < lower) return lower;\n  if (t > upper) return upper;\n  return t;\n};\n\n// todo: could it be worth it to give this thing some convenience setters?\nconst make = (x, y, width, height) => {\n  return { x, y, width, height };\n};\n\nconst copy = r => make(r.x, r.y, r.width, r.height);\n\nconst topLeft = rect => _Point__WEBPACK_IMPORTED_MODULE_0__[\"default\"].make(rect.x, rect.y);\nconst topRight = rect => _Point__WEBPACK_IMPORTED_MODULE_0__[\"default\"].make(rect.x + rect.width, rect.y);\nconst bottomLeft = rect => _Point__WEBPACK_IMPORTED_MODULE_0__[\"default\"].make(rect.x, rect.y + rect.height);\nconst bottomRight = rect => _Point__WEBPACK_IMPORTED_MODULE_0__[\"default\"].make(rect.x + rect.width, rect.y + rect.height);\n\nconst containsPoint = (rect, point) => {\n  return rect.x <= point.x && rect.x + rect.width > point.x && rect.y <= point.y && rect.y + rect.height > point.y;\n};\n\nconst containsRectangle = (outer, inner) => {\n  return containsPoint(outer, topLeft(inner)) && containsPoint(outer, topRight(inner)) && containsPoint(outer, bottomLeft(inner)) && containsPoint(outer, bottomRight(inner));\n};\n\nconst getCenter = rectangle => {\n  return _Point__WEBPACK_IMPORTED_MODULE_0__[\"default\"].make(rectangle.x + rectangle.width / 2, rectangle.y + rectangle.height / 2);\n};\nconst setCenter = (rectangle, centerPoint) => {\n  _Point__WEBPACK_IMPORTED_MODULE_0__[\"default\"].set(rectangle, _Point__WEBPACK_IMPORTED_MODULE_0__[\"default\"].add(centerPoint, _Point__WEBPACK_IMPORTED_MODULE_0__[\"default\"].make(-rectangle.width / 2, -rectangle.height / 2)));\n  return rectangle;\n};\n\nconst clampPoint = (rectangle, point) => {\n  point.x = clamp(rectangle.x, rectangle.x + rectangle.width, point.x);\n  point.y = clamp(rectangle.y, rectangle.y + rectangle.height, point.y);\n  return point;\n};\n\n// TODO: Write tests for this one\nconst clampRectangle = (rectContainer, rectInsider) => {\n  if (rectInsider.width > rectContainer.width || rectInsider.height > rectContainer.height) {\n    throw new Error(\"cannot clamp a rectangle into a smaller rectangle\");\n  }\n  // We are now guaranteed the insider will fit, now to just determine from what direction\n  // We will start by clamping the topLeft, and then the bottomRight\n  clampPoint(rectContainer, rectInsider);\n  const netBottomRight = clampPoint(rectContainer, bottomRight(rectInsider));\n  _Point__WEBPACK_IMPORTED_MODULE_0__[\"default\"].set(rectInsider, _Point__WEBPACK_IMPORTED_MODULE_0__[\"default\"].add(netBottomRight, _Point__WEBPACK_IMPORTED_MODULE_0__[\"default\"].make(-rectInsider.width, -rectInsider.height)));\n};\n\n/* harmony default export */ __webpack_exports__[\"default\"] = ({\n  make,\n  copy,\n  getCenter,\n  setCenter,\n  containsPoint,\n  containsRectangle,\n  topLeft,\n  topRight,\n  bottomLeft,\n  bottomRight,\n  clampPoint,\n  clampRectangle\n});\n\n//# sourceURL=webpack:///./client/src/js/shapes/rectangle.js?");
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _Point__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./Point */ "./client/src/js/shapes/Point.js");
+
+
+const clamp = (lower, upper, t) => {
+  if (t < lower) return lower;
+  if (t > upper) return upper;
+  return t;
+};
+
+// todo: could it be worth it to give this thing some convenience setters?
+const make = (x, y, width, height) => {
+  return { x, y, width, height };
+};
+
+const copy = r => make(r.x, r.y, r.width, r.height);
+
+const topLeft = rect => _Point__WEBPACK_IMPORTED_MODULE_0__["default"].make(rect.x, rect.y);
+const topRight = rect => _Point__WEBPACK_IMPORTED_MODULE_0__["default"].make(rect.x + rect.width, rect.y);
+const bottomLeft = rect => _Point__WEBPACK_IMPORTED_MODULE_0__["default"].make(rect.x, rect.y + rect.height);
+const bottomRight = rect => _Point__WEBPACK_IMPORTED_MODULE_0__["default"].make(rect.x + rect.width, rect.y + rect.height);
+
+const containsPoint = (rect, point) => {
+  return rect.x <= point.x && rect.x + rect.width > point.x && rect.y <= point.y && rect.y + rect.height > point.y;
+};
+
+const containsRectangle = (outer, inner) => {
+  return containsPoint(outer, topLeft(inner)) && containsPoint(outer, topRight(inner)) && containsPoint(outer, bottomLeft(inner)) && containsPoint(outer, bottomRight(inner));
+};
+
+const getCenter = rectangle => {
+  return _Point__WEBPACK_IMPORTED_MODULE_0__["default"].make(rectangle.x + rectangle.width / 2, rectangle.y + rectangle.height / 2);
+};
+const setCenter = (rectangle, centerPoint) => {
+  _Point__WEBPACK_IMPORTED_MODULE_0__["default"].set(rectangle, _Point__WEBPACK_IMPORTED_MODULE_0__["default"].add(centerPoint, _Point__WEBPACK_IMPORTED_MODULE_0__["default"].make(-rectangle.width / 2, -rectangle.height / 2)));
+  return rectangle;
+};
+
+const clampPoint = (rectangle, point) => {
+  point.x = clamp(rectangle.x, rectangle.x + rectangle.width, point.x);
+  point.y = clamp(rectangle.y, rectangle.y + rectangle.height, point.y);
+  return point;
+};
+
+// TODO: Write tests for this one
+const clampRectangle = (rectContainer, rectInsider) => {
+  if (rectInsider.width > rectContainer.width || rectInsider.height > rectContainer.height) {
+    throw new Error("cannot clamp a rectangle into a smaller rectangle");
+  }
+  // We are now guaranteed the insider will fit, now to just determine from what direction
+  // We will start by clamping the topLeft, and then the bottomRight
+  clampPoint(rectContainer, rectInsider);
+  const netBottomRight = clampPoint(rectContainer, bottomRight(rectInsider));
+  _Point__WEBPACK_IMPORTED_MODULE_0__["default"].set(rectInsider, _Point__WEBPACK_IMPORTED_MODULE_0__["default"].add(netBottomRight, _Point__WEBPACK_IMPORTED_MODULE_0__["default"].make(-rectInsider.width, -rectInsider.height)));
+};
+
+/* harmony default export */ __webpack_exports__["default"] = ({
+  make,
+  copy,
+  getCenter,
+  setCenter,
+  containsPoint,
+  containsRectangle,
+  topLeft,
+  topRight,
+  bottomLeft,
+  bottomRight,
+  clampPoint,
+  clampRectangle
+});
 
 /***/ }),
 
@@ -237,7 +892,41 @@ eval("__webpack_require__.r(__webpack_exports__);\n/* harmony import */ var _Poi
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-eval("__webpack_require__.r(__webpack_exports__);\n/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, \"START\", function() { return START; });\n/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, \"OUT_OF_BOUNDS\", function() { return OUT_OF_BOUNDS; });\n/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, \"WALL\", function() { return WALL; });\n/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, \"AIR_WALK\", function() { return AIR_WALK; });\n/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, \"NO_JUMP\", function() { return NO_JUMP; });\nconst START = `\n    it is wet and dark\n    deep within this hollowed earth\n    you search for an exit.\n`;\n\nconst OUT_OF_BOUNDS = `\n    the world comes to end\n    even everywhere has limits\n    try another way\n`;\n\nconst WALL = `\n    the stone does not care\n    your efforts at movement fail\n    the cold has not left\n`;\n\nconst AIR_WALK = `\n    even though time stand still\n    the future has been secured\n    you are going down\n`;\n\nconst NO_JUMP = `\n    you can do so much\n    but even you have limits\n    alas, you can't jump\n`;\n\n//# sourceURL=webpack:///./client/src/js/text.js?");
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "START", function() { return START; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "OUT_OF_BOUNDS", function() { return OUT_OF_BOUNDS; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "WALL", function() { return WALL; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "AIR_WALK", function() { return AIR_WALK; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "NO_JUMP", function() { return NO_JUMP; });
+const START = `
+    it is wet and dark
+    deep within this hollowed earth
+    you search for an exit.
+`;
+
+const OUT_OF_BOUNDS = `
+    the world comes to end
+    even everywhere has limits
+    try another way
+`;
+
+const WALL = `
+    the stone does not care
+    your efforts at movement fail
+    the cold has not left
+`;
+
+const AIR_WALK = `
+    even though time stand still
+    the future has been secured
+    you are going down
+`;
+
+const NO_JUMP = `
+    you can do so much
+    but even you have limits
+    alas, you can't jump
+`;
 
 /***/ }),
 
@@ -249,8 +938,13 @@ eval("__webpack_require__.r(__webpack_exports__);\n/* harmony export (binding) *
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-eval("__webpack_require__.r(__webpack_exports__);\n/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, \"$\", function() { return $; });\n/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, \"flatten\", function() { return flatten; });\nconst $ = q => document.querySelector(q);\nconst flatten = arr => arr.reduce((total, line) => total.concat(line), []);\n\n//# sourceURL=webpack:///./client/src/js/utils.js?");
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "$", function() { return $; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "flatten", function() { return flatten; });
+const $ = q => document.querySelector(q);
+const flatten = arr => arr.reduce((total, line) => total.concat(line), []);
 
 /***/ })
 
 /******/ });
+//# sourceMappingURL=bundle.js.map
