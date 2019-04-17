@@ -1,4 +1,4 @@
-import Point from "./Point";
+import Point from "./point";
 
 const clamp = (lower, upper, t) => {
   if(t < lower) return lower;
