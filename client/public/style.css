@@ -1,0 +1,18 @@
+body {
+  font-family: 'VT323', monospace;
+  color:#CCCCCC;
+  background: #333333;
+  font-size:36px;
+}
+
+pre {
+  background:#111111;
+  width: fit-content;
+  padding: 5px;
+  font-family: 'VT323', monospace;
+  line-height: 1em;
+}
+
+.cell:hover {
+  background:gray;
+}
