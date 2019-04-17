@@ -7,6 +7,8 @@ import Camera from './camera'
 import Shapes from './shapes';
 const {Rectangle, Point} = Shapes;
 
+const world = {};
+
 import levelBank from './levels'
 
 const screen = $("#scuba");
@@ -30,10 +32,6 @@ let camera = Camera.make(Rectangle.make(0,0,30, 10), map.player);
 const renderStatus = (map, target) => {
   target.innerHTML = `Oxygen: ${map.player.oxygen}/ ${map.player.maxOxygen }`;
 }
-
-
-
-
 const renderSidebar = (message) => {
   sidebarTarget.innerHTML = message;
 };
@@ -95,14 +93,10 @@ const tryMovePlayer = (direction, cameraBox, _map) => {
   Point.addTo(player, direction);
 
   if(Point.equal(player, _map.exit)){
-    console.log("test");
     levelIndex = (levelIndex + 1) % levels.length;
-    console.log(levelIndex);
-    console.log(levels);
     map = levels[levelIndex];
     _map = map;
     levelBank.printMap(_map);
-    console.log(_map);
     renderSidebar("You have won... for now.")
     _map.player.oxygen = _map.player.maxOxygen;
     Point.set(map.player, map.start);
