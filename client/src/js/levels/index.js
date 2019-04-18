@@ -5,7 +5,7 @@ import Shapes from '../shapes';
 import * as test_level from './test_level';
 import * as test_level2 from './test_level2';
 import * as test_level3 from './test_level3';
-console.log(test_level);
+
 
 const stringToMap = (str) => {
   const lines = str.trim().split('\n');
@@ -45,7 +45,6 @@ const buildMap = level => {
 }
 
 const printMap = map => {
-  console.log("MAP");
   map.getAll().forEach(line => {
     console.log(line.map(c => c.character).join(""));
   });

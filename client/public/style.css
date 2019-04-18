@@ -2,15 +2,28 @@ body {
   font-family: 'VT323', monospace;
   color:#CCCCCC;
   background: #333333;
-  font-size:36px;
+  font-size:20px;
 }
 
 pre {
   background:#111111;
   width: fit-content;
   padding: 5px;
-  font-family: 'VT323', monospace;
+  font-family: monospace;
   line-height: 1em;
+}
+
+.status_container {
+  background:#111111;
+  min-height:100px;
+  display:flex;
+  justify-content: space-between;
+  width:80%;
+  margin:auto;
+}
+
+.status_container pre {
+  margin:5px;
 }
 
 .cell:hover {

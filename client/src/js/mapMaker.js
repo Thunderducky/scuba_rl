@@ -1,6 +1,10 @@
 import { $, flatten } from './utils';
-export const makeCell = () => {
+import Shapes from "./shapes";
+import GAME_SYMBOLS from "./symbols";
+export const makeCell = (x,y) => {
   return {
+    x,
+    y,
     color: "white",
     character: ".",
     wall: false,
@@ -19,29 +23,29 @@ const zeroTypes = cell => {
 
 export const setWater = cell => {
   cell.color = "blue";
-  cell.character = "~";
+  cell.character = GAME_SYMBOLS.WATER;
   zeroTypes(cell);
   cell.water = true;
   return cell;
 };
 export const setAir = cell => {
   cell.color = "white";
-  cell.character = ".";
+  cell.character = GAME_SYMBOLS.AIR;
   zeroTypes(cell);
   cell.air = true;
   return cell;
 };
 export const setWall = cell => {
-  cell.color = "green";
-  cell.character = "=";
+  cell.color = "gray";
+  cell.character = GAME_SYMBOLS.WALL;
   zeroTypes(cell);
   cell.wall = true;
   return cell;
 };
 
 export const setLadder = cell => {
-  cell.color = "red";
-  cell.character = "H";
+  cell.color = "brown";
+  cell.character = GAME_SYMBOLS.LADDER;
   zeroTypes(cell);
   cell.ladder = true;
   return cell;
@@ -52,7 +56,7 @@ export const makeMap = (params) => {
   for(let y = 0; y < params.height; y++){
     const line = [];
     for(let x = 0; x < params.width; x++){
-      line.push(makeCell());
+      line.push(makeCell(x,y));
     }
     cells.push(line);
   }
@@ -79,11 +83,17 @@ export const makeMap = (params) => {
         .filter((_, y) => y >= box.y && y < box.y + box.height) // calculate in y range)
         .map(line => line.slice(box.x, box.x + box.width));
     },
+    getBounds: function(){
+      return Shapes.Rectangle.make(0, 0, this.width, this.height);
+    },
     getCell: function(x,y){
       if(y < 0 || y >= this._cells.length){
         return undefined;
       }
       return this._cells[y][x];
+    },
+    getCellP: function(p){
+      return this.getCell(p.x, p.y);
     },
     getCellNeighbors: function(x,y){
       const neighbors = [
@@ -103,8 +113,26 @@ export const makeMap = (params) => {
     getAllFlat: function(){
       return flatten(this._cells.map(l => l));
     },
-    getGraphTraverser: function(){
-      throw "Not Implemented Yet";
+    getGraphTraverser: function(x,y){
+      const map = this;
+      return {
+        current: map.getCell(x,y),
+        getCellNeighbors: function(){
+          return map.getCellNeighbors(this.current.x, this.current.y);
+        },
+        peek: function(offset){
+          return map.getCell(offset.x + this.current.x, offset.y + this.current.y);
+        },
+        move: function(offset){
+          this.current = map.getCell(offset.x + this.current.x, offset.y + this.current.y);
+          return this.current;
+        }
+
+      }
+    },
+    getGraphTraverserP: function(p){
+      return this.getGraphTraverser(p.x, p.y)
     }
+
   }
 }

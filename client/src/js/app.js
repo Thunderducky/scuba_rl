@@ -7,7 +7,7 @@ import Camera from './camera'
 import Shapes from './shapes';
 const {Rectangle, Point} = Shapes;
 
-const world = {};
+
 
 import levelBank from './levels'
 
@@ -15,100 +15,180 @@ const screen = $("#scuba");
 const statusbar = $("#status_bar");
 const sidebarTarget = $("#sidebar_target");
 
-const levels = [];
-for(let l in levelBank.levels){
-  console.log(l);
-  levels.push(levelBank.levels[l]);
-}
-console.log(levels);
-
-const urlParams = new URLSearchParams(window.location.search);
-let levelIndex = +urlParams.get('level') || 0;
-levelIndex = Math.min(levelIndex, levels.length - 1);
-
-
-let map = levels[levelIndex]; //levels[levelIndex]; //makeMap({width:50,height:20});
-let camera = Camera.make(Rectangle.make(0,0,30, 10), map.player);
 const renderStatus = (map, target) => {
   target.innerHTML = `Oxygen: ${map.player.oxygen}/ ${map.player.maxOxygen }`;
 }
 const renderSidebar = (message) => {
   sidebarTarget.innerHTML = message;
 };
-Camera.updateTracking(camera, Rectangle.make(0,0,map.width, map.height));
-renderMap(map, screen, camera.frame);
-renderStatus(map, statusbar);
+
+// PUBSUB to output systems, like a render trigger, sound and music, should there be any
+
+// SETUP LEVELS
+const levels = [];
+for(let l in levelBank.levels){
+  levels.push(levelBank.levels[l]);
+}
+const urlParams = new URLSearchParams(window.location.search);
+let levelIndex = +urlParams.get('level') || 0;
+levelIndex = Math.min(levelIndex, levels.length - 1);
+
+// we'll move player outside of the map
+const colorText = (text, color) => `<span style="color:${color}">${text}</span>`
+const trimLines = text => {
+  return text.split('\n').map(l => l.trim()).join('\n');
+};
+const indentLines = (text, spaces) => {
+  const arr = [];
+  arr.length = spaces;
+  const indent = arr.fill(' ').join('');
+  return text.split('\n').map(l => indent + l).join('\n');
+};
+
+const describeCell = cell => {
+  let cellType = 'Unknown';
+  if(cell.water){ cellType="water" }
+  else if(cell.air){ cellType="air" }
+  else if(cell.wall){ cellType="wall" }
+  else if(cell.ladder){ cellType="ladder" }
+  return trimLines(`
+    ${cellType}
+    X: ${cell.x}, Y: ${cell.y}
+  `).trim();
+};
+
+const world = {
+  player: {},// TODO: extract the player from the map and put them here
+  map: levels[levelIndex],
+  camera: Camera.make(Rectangle.make(0,0,30,10)),
+  update: function(){
+    Camera.updateTracking(world.camera, world.map.getBounds())
+    // Move this to just being rendering the world
+    renderMap(world.map, screen, world.camera.frame);
+    renderStatus(world.map, statusbar);
+  },
+  nextMap: function(){
+    renderSidebar(TEXT.WIN);
+    levelIndex = (levelIndex + 1) % levels.length;
+    this.map = levels[levelIndex];
+    this.camera.target = this.map.player;
+    this.update();
+  }
+};
+world.camera.target = world.map.player;
+world.update();
 renderSidebar(TEXT.START);
 
 
-const tryMovePlayer = (direction, cameraBox, _map) => {
-  const { player } = _map;
-  const mapBox = Rectangle.make(0, 0, _map.width, _map.height);
-  const netMove = Point.add(player, direction);
+const canPlayerMove = (player, direction, map) => {
+  const targetPoint = Point.add(player, direction);
 
-  const source = _map.getCell(player.x, player.y);
-  const destination = _map.getCell(netMove.x, netMove.y);
-
-  // destination blockers
-  if(!Rectangle.containsPoint(mapBox, netMove)){
+  // FORCE US TO STAY IN BOUNDS
+  if(!Rectangle.containsPoint(map.getBounds(), targetPoint)){
+    // EXTERNAL, perhaps we can have an event
+    // handle this
     renderSidebar(TEXT.OUT_OF_BOUNDS);
     return false;
   }
-  if(destination.wall){
-    renderSidebar(TEXT.WALL)
+
+  // SHORTCUTS FOR OUR CELLS
+  const source = map.getGraphTraverser(player.x, player.y);
+  const destination = map.getGraphTraverser(targetPoint.x, targetPoint.y);
+
+  const movingUp = direction.y < 0;
+  const movingDown = direction.y > 0;
+  const movingLeft = direction.x < 0;
+  const movingRight = direction.x > 0;
+  const below = source.peek(Point.DOWN);
+  const hasFloor = (below == null || below.wall || below.ladder);
+  // CAN'T MOVE INTO A WALL
+  if(destination.current.wall){
+    if(movingDown){
+      renderSidebar(TEXT.WALL_DOWN);
+    } else {
+      renderSidebar(TEXT.WALL);
+    }
     return false;
   }
-
-  const hasFloor = (x,y) => {
-    const lower = _map.getCell(x, y+1);
-    return lower.wall || lower.ladder;
-  };
-
-  if(source.air && !hasFloor(player.x, player.y) && direction.y <= 0){ // potentially allow a diagnol in the future
-    renderSidebar(TEXT.AIR_WALK);
+  // if the destination is air, we must be moving from a floor or water
+  else if(destination.current.air){
+    if(movingDown){
+      return true;
+    }
+    else if(movingUp){
+      if(!source.current.ladder){
+        renderSidebar(TEXT.NO_JUMP);
+        return false;
+      } else {
+        return true;
+      }
+    }
+    else if(movingLeft || movingRight){
+      if(!hasFloor && source.current.air){
+        renderSidebar(TEXT.AIR_WALK);
+        return false;
+      } else {
+        return true;
+      }
+    }
+  }
+  else if(destination.current.water){
+    // we can always enter water
+    return true;
+  } else if(destination.current.ladder){
+    // we can always enter a ladder
+    return true;
+  } else {
+    // anything else, assume no
     return false;
   }
-  if(source.air && direction.y < 0){
-    renderSidebar(TEXT.NO_JUMP);
+};
+// oxygen doesn't travel along corners
+const checkOxygen = traverser => {
+  const cells = [traverser.current, ...traverser.getCellNeighbors()];
+  return cells.some(cell => !cell.water && !cell.wall);
+}
+
+const handleDeath = (player, map) => {
+  renderSidebar(TEXT.DEATH);
+  Point.set(player, map.start);
+  player.oxygen = player.maxOxygen;
+}
+
+const tryMovePlayer = (direction, map) => {
+  const { player } = map;
+  if(!canPlayerMove(player, direction, map)){
     return false;
   }
+  const source = map.getGraphTraverserP(player);
+  const destination = map.getGraphTraverserP(Point.add(player, direction));
 
-  // HANDLE OXYGEN SUPPLY
-  const hasOxygen = p => [_map.getCell(p.x,p.y), ..._map.getCellNeighbors(p.x,p.y)].some(cell => !cell.water && !cell.wall);
-  if(!hasOxygen(player) && !hasOxygen(netMove)){
+  // Oxygen Check
+  if(!checkOxygen(source) && !checkOxygen(destination)){
     player.oxygen -= 1;
-    if(player.oxygen < 0){
-      renderSidebar(`
-        You awaken where you once began
-        perhaps wiser than before...`
-      );
-      Point.set(player, map.start);
-      player.oxygen = 10;
-      Camera.updateTracking(camera, Rectangle.make(0,0,_map.width, _map.height));
+    if(player.oxygen === 2){
+      renderSidebar(TEXT.LOW_OXYGEN);
+    }
+    else if(player.oxygen === 0){
+      renderSidebar(TEXT.CRITICAL_OXYGEN);
+    }
+    else if(player.oxygen < 0){
+      handleDeath(player, map)
       return false;
     }
   } else {
+    if(player.oxygen <= 2){
+      renderSidebar(TEXT.LOW_OXYGEN_RELIEF);
+    }
     player.oxygen = player.maxOxygen;
   }
+  // Actually move the player
   Point.addTo(player, direction);
 
-  if(Point.equal(player, _map.exit)){
-    levelIndex = (levelIndex + 1) % levels.length;
-    map = levels[levelIndex];
-    _map = map;
-    levelBank.printMap(_map);
-    renderSidebar("You have won... for now.")
-    _map.player.oxygen = _map.player.maxOxygen;
-    Point.set(map.player, map.start);
-    camera = Camera.make(Rectangle.make(0,0,30, 10), map.player);
-    Camera.updateTracking(camera, Rectangle.make(0,0,_map.width, _map.height));
-    renderMap(_map, screen, camera.frame);
+  // Process Level End
+  if(Point.equal(player, map.exit)){
+    world.nextMap();
   }
-
-
-  // tryMoveCamera(direction, cameraBox, map);
-  Camera.updateTracking(camera, Rectangle.make(0,0,map.width, map.height));
-  return true;
 }
 
 // UI SECTION
@@ -119,68 +199,33 @@ document.onkeydown = function(e){
   }
   switch(e.key){
     case "ArrowLeft":
-      tryMovePlayer(Point.make(-1, 0), camera.frame, map);
+      tryMovePlayer(Point.make(-1, 0), world.map);
       break;
     case "ArrowRight":
-      tryMovePlayer(Point.make(1,0), camera.frame, map);
+      tryMovePlayer(Point.make(1,0), world.map);
       break;
     case "ArrowUp":
-      tryMovePlayer(Point.make(0,-1), camera.frame, map);
+      tryMovePlayer(Point.make(0,-1), world.map);
       break;
     case "ArrowDown":
-      tryMovePlayer(Point.make(0,1), camera.frame, map);
+      tryMovePlayer(Point.make(0,1), world.map);
       break;
     default:
       console.log("unused key");
   }
-  renderMap(map, screen, camera.frame);
-  renderStatus(map, statusbar);
+  world.update();
 };
 
-// Helper Function
-document.onclick = function(e){
-  const rootEls = e.path.filter(el => el.className === "cell");
-  if(rootEls.length > 0){
-    const rootEl = rootEls[0];
-    const x = +rootEl.getAttribute("x");
-    const y = +rootEl.getAttribute("y");
-    console.log(map.getCell(x,y));
-    if(x === map.player.x && y === map.player.y){
-      console.log("Player");
-      console.log(map.player);
+
+document.onmousemove = function(e){
+  if(e.path.length > 0){
+    const primeElement = e.path[0];
+    if(primeElement.className === "cell"){
+      const x = +primeElement.getAttribute("x");
+      const y = +primeElement.getAttribute("y");
+      const cell = world.map.getCell(x,y);
+      console.log(describeCell(cell));
+      $("#tile_preview").innerHTML = describeCell(cell)
     }
   }
-}
-
-// TODO: FIXME!
-document.onmouseover = function(e){
-  // const rootEls = e.path.filter(el => el.className === "cell");
-  // let result = "";
-  // if(rootEls.length > 0){
-  //   const rootEl = rootEls[0];
-  //   const x = +rootEl.getAttribute("x") - camera.frame.x;
-  //   const y = +rootEl.getAttribute("y") - camera.frame.y;
-  //   console.log(map.getCell(x, y));
-  //
-  //   const cell = map.getCell(x,y);
-  //   if(cell.air){
-  //     result += " Air "
-  //   }
-  //   else if(cell.ladder){
-  //     result += " Ladder "
-  //   }
-  //   else if(cell.water){
-  //     result += " Water "
-  //   }
-  //   else if(cell.wall){
-  //     result += " Wall "
-  //   }
-  //   if(x === map.player.x && y === map.player.y){
-  //     result += "- Player";
-  //   }
-  //   if(x === map.exit.x && y === map.exit.y){
-  //     result += "- Exit";
-  //   }
-  // }
-  // statusbar.innerHTML = result;
-}
+};

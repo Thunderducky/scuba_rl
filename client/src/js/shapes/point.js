@@ -27,6 +27,11 @@ const equal = (a,b) => {
 };
 
 export default {
+  ZERO: Object.freeze(make(0,0)),
+  LEFT: Object.freeze(make(-1, 0)),
+  RIGHT: Object.freeze(make(1, 0)),
+  DOWN: Object.freeze(make(0, 1)),
+  UP: Object.freeze(make(0, -1)),
   make,
   equal,
   set,
