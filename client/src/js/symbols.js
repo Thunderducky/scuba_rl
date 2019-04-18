@@ -2,8 +2,8 @@
 export default {
     PLAYER: '@',
     EXIT: '!',
-    WALL: '#',
-    WATER: '~',
+    WALL: '▢',
+    WATER: '⏝',
     LADDER: 'H',
     AIR: ' ',
 }

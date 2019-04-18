@@ -22,21 +22,23 @@ const zeroTypes = cell => {
 };
 
 export const setWater = cell => {
-  cell.color = "blue";
+  cell.color = "white";
+  cell.background = "blue";
   cell.character = GAME_SYMBOLS.WATER;
   zeroTypes(cell);
   cell.water = true;
   return cell;
 };
 export const setAir = cell => {
-  cell.color = "white";
+  cell.color = "darkgray";
   cell.character = GAME_SYMBOLS.AIR;
   zeroTypes(cell);
   cell.air = true;
   return cell;
 };
 export const setWall = cell => {
-  cell.color = "gray";
+  cell.color = "lightgray";
+  cell.background = "darkgray";
   cell.character = GAME_SYMBOLS.WALL;
   zeroTypes(cell);
   cell.wall = true;
@@ -45,6 +47,7 @@ export const setWall = cell => {
 
 export const setLadder = cell => {
   cell.color = "brown";
+  cell.background ="darkgray";
   cell.character = GAME_SYMBOLS.LADDER;
   zeroTypes(cell);
   cell.ladder = true;

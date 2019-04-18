@@ -2,14 +2,16 @@ import GAME_SYMBOLS from './symbols';
 // We'll reorganize this at some point
 import Shapes from './shapes';
 // LOTS OF REFACTOR TO DO
+
+// TODO allow us to set background colors
 const _renderCell = (map, cell, x, y, cameraX = 0, cameraY = 0) => {
   const mapPoint = Shapes.Point.make(x + cameraX, y + cameraY);
   if(map.player.x === x + cameraX && map.player.y === y + cameraY){
-    return `<span class="cell"  x="${mapPoint.x}" y="${mapPoint.y}" style="color:yellow">${GAME_SYMBOLS.PLAYER}</span>`
+    return `<span class="cell"  x="${mapPoint.x}" y="${mapPoint.y}" style="color:yellow; ${cell.background ? `background:${cell.background}` : '' }">${GAME_SYMBOLS.PLAYER}</span>`
   } else if (map.exit.x === x + cameraX && map.exit.y === y + cameraY) {
     return `<span class="cell"  x="${mapPoint.x}" y="${mapPoint.y}" style="color:yellow">${GAME_SYMBOLS.EXIT}</span>`
   } else {
-    return `<span class="cell" x="${mapPoint.x}" y="${mapPoint.y}" style="color:${cell.color}">${cell.character}</span>`
+    return `<span class="cell" x="${mapPoint.x}" y="${mapPoint.y}" style="color:${cell.color};${cell.background ? `background:${cell.background}` : '' }">${cell.character}</span>`
   }
 }
 
