@@ -1,6 +1,6 @@
 import { $, flatten } from './utils';
 import { makeMap, setWater, setAir, setWall, setLadder } from './mapMaker';
-import { renderMap } from './mapRenderer';
+import { renderWorld } from './mapRenderer';
 import * as TEXT from "./text"
 import Camera from './camera'
 // for some reason the normal import isn't working :P
@@ -58,24 +58,31 @@ const describeCell = cell => {
 };
 
 const world = {
-  player: {},// TODO: extract the player from the map and put them here
+  player: {
+    x:4,
+    y:2,
+    oxygen: 10,
+    maxOxygen: 10
+  },// TODO: extract the player from the map and put them here
+  gameObjects: [],
   map: levels[levelIndex],
   camera: Camera.make(Rectangle.make(0,0,30,10)),
   update: function(){
     Camera.updateTracking(world.camera, world.map.getBounds())
     // Move this to just being rendering the world
-    renderMap(world.map, screen, world.camera.frame);
-    renderStatus(world.map, statusbar);
+    renderWorld(world, screen);
+    renderStatus(world, statusbar);
   },
   nextMap: function(){
     renderSidebar(TEXT.WIN);
     levelIndex = (levelIndex + 1) % levels.length;
     this.map = levels[levelIndex];
-    this.camera.target = this.map.player;
+    Point.set(this.player, this.map.start);
     this.update();
   }
 };
-world.camera.target = world.map.player;
+Point.set(world.player, world.map.start);
+world.camera.target = world.player;
 world.update();
 renderSidebar(TEXT.START);
 
@@ -155,8 +162,7 @@ const handleDeath = (player, map) => {
   player.oxygen = player.maxOxygen;
 }
 
-const tryMovePlayer = (direction, map) => {
-  const { player } = map;
+const tryMovePlayer = (player, direction, map) => {
   if(!canPlayerMove(player, direction, map)){
     return false;
   }
@@ -192,23 +198,23 @@ const tryMovePlayer = (direction, map) => {
 }
 
 // UI SECTION
+
 document.onkeydown = function(e){
   const preventDefaultList = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
   if(preventDefaultList.includes(e.key)){
     e.preventDefault();
   }
+  const keymap = {};
+  keymap["ArrowLeft"] = Point.make(-1,0);
+  keymap["ArrowRight"] = Point.make(1,0);
+  keymap["ArrowUp"] = Point.make(0,-1);
+  keymap["ArrowDown"] = Point.make(0,1);
   switch(e.key){
     case "ArrowLeft":
-      tryMovePlayer(Point.make(-1, 0), world.map);
-      break;
     case "ArrowRight":
-      tryMovePlayer(Point.make(1,0), world.map);
-      break;
     case "ArrowUp":
-      tryMovePlayer(Point.make(0,-1), world.map);
-      break;
     case "ArrowDown":
-      tryMovePlayer(Point.make(0,1), world.map);
+      tryMovePlayer(world.player, keymap[e.key], world.map);
       break;
     default:
       console.log("unused key");

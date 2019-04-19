@@ -1,7 +1,7 @@
 
 export default {
     PLAYER: '@',
-    EXIT: '!',
+    EXIT: '☖',
     WALL: '▢',
     WATER: '⏝',
     LADDER: 'H',
